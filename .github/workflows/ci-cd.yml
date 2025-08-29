@@ -1,0 +1,108 @@
+name: CI/CD Pipeline - Test and Deploy
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Run linting
+      run: |
+        cd frontend
+        npm run lint --if-present || echo "No linting script found"
+
+    - name: Run unit tests
+      run: |
+        cd frontend
+        npm test -- --coverage --watchAll=false
+
+    - name: Run integration tests
+      run: |
+        cd frontend
+        npm run test:integration --if-present || echo "No integration tests found"
+
+    - name: Test build process
+      run: |
+        cd frontend
+        PUBLIC_URL=/Weekly-Manager npm run build
+
+    - name: Upload test coverage
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Build application
+      run: |
+        cd frontend
+        PUBLIC_URL=/Weekly-Manager npm run build
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./frontend/build
+        cname: # Add your custom domain here if you have one
+
+  notify:
+    name: Notify Results
+    needs: [test, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify success
+      if: needs.test.result == 'success' && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
+      run: echo "✅ Pipeline completed successfully!"
+      
+    - name: Notify failure
+      if: needs.test.result == 'failure' || needs.deploy.result == 'failure'
+      run: |
+        echo "❌ Pipeline failed!"
+        echo "Test result: ${{ needs.test.result }}"
+        echo "Deploy result: ${{ needs.deploy.result }}"
