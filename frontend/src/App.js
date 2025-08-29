@@ -510,7 +510,7 @@ function WeeklyReport({ className, tasks }) {
 
 export default function App() {
   return (
-    <Router>
+    <Router basename="/Weekly-Manager">
       <div className="App">
         <Routes>
           <Route path="/" element={<MainScreen />} />
