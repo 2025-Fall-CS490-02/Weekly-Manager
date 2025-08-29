@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
 import './App.css';
 import PrintPage from "./PrintPage.js"; 
@@ -510,7 +510,7 @@ function WeeklyReport({ className, tasks }) {
 
 export default function App() {
   return (
-    <Router basename="/Weekly-Manager">
+    <Router>
       <div className="App">
         <Routes>
           <Route path="/" element={<MainScreen />} />
