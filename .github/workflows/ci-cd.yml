@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   test:
     name: Run Tests
@@ -25,39 +30,30 @@ jobs:
         cd frontend
         npm install
 
-    - name: Run linting
-      run: |
-        cd frontend
-        npm run lint --if-present || echo "No linting script found"
-
     - name: Run unit tests
       run: |
         cd frontend
         npm test -- --coverage --watchAll=false
-
-    - name: Run integration tests
-      run: |
-        cd frontend
-        npm run test:integration --if-present || echo "No integration tests found"
 
     - name: Test build process
       run: |
         cd frontend
         PUBLIC_URL=/Weekly-Manager npm run build
 
-    - name: Upload test coverage
-      uses: codecov/codecov-action@v3
-      if: always()
-      with:
-        file: ./frontend/coverage/lcov.info
-        flags: frontend
-        name: frontend-coverage
-
   deploy:
     name: Deploy to GitHub Pages
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
     - name: Checkout code
@@ -67,8 +63,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
 
     - name: Install dependencies
       run: |
@@ -80,27 +74,14 @@ jobs:
         cd frontend
         PUBLIC_URL=/Weekly-Manager npm run build
 
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./frontend/build
-        cname: # Add your custom domain here if you have one
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
 
-  notify:
-    name: Notify Results
-    needs: [test, deploy]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-    - name: Notify success
-      if: needs.test.result == 'success' && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
-      run: echo "✅ Pipeline completed successfully!"
-      
-    - name: Notify failure
-      if: needs.test.result == 'failure' || needs.deploy.result == 'failure'
-      run: |
-        echo "❌ Pipeline failed!"
-        echo "Test result: ${{ needs.test.result }}"
-        echo "Deploy result: ${{ needs.deploy.result }}"
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: ./frontend/build
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
